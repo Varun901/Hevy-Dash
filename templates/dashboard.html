@@ -3,42 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <title>Hevy Workout Dashboard</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: var(--bg-color, #f4f4f4);
-            color: var(--text-color, #222);
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 0;
+            transition: background-color 0.4s, color 0.4s;
         }
+
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+        }
+
+        body.dark-mode {
+            --bg-color: #181818;
+            --text-color: #f5f5f5;
+        }
+
         header {
-            background: var(--header-bg, #333);
-            color: white;
-            padding: 15px;
-            text-align: center;
+            padding: 1rem;
+            background: var(--text-color);
+            color: var(--bg-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .toggle-container {
-            position: absolute;
-            right: 20px;
-            top: 15px;
+
+        h1 {
+            margin: 0;
         }
-        main {
-            padding: 20px;
+
+        .toggle-btn {
+            cursor: pointer;
+            background: none;
+            border: 1px solid var(--bg-color);
+            padding: 0.4rem 0.8rem;
+            color: var(--bg-color);
+            border-radius: 4px;
         }
-        .chart-container {
-            background: var(--card-bg, white);
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+
+        .container {
+            padding: 1rem;
+            max-width: 1200px;
+            margin: auto;
         }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 1.5rem;
+        }
+
         img {
-            max-width: 100%;
+            width: 100%;
+            border-radius: 6px;
+            background: var(--bg-color);
+            padding: 0.5rem;
+            box-shadow: 0px 0px 5px rgba(0,0,0,0.1);
         }
+
+        form {
+            margin-bottom: 1rem;
+        }
+
         select {
-            padding: 6px;
-            margin-bottom: 10px;
+            padding: 0.4rem;
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .charts {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -46,70 +87,42 @@
 
 <header>
     <h1>Hevy Workout Dashboard</h1>
-    <div class="toggle-container">
-        <button onclick="toggleTheme()">Toggle Light/Dark</button>
-    </div>
+    <button class="toggle-btn" onclick="toggleDarkMode()">Toggle Dark Mode</button>
 </header>
 
-<main>
-    <!-- PR Tracking -->
-    <div class="chart-container">
-        <h2>Personal Record Tracking</h2>
-        <label for="exercise-select">Select Exercise:</label>
-        <select id="exercise-select" onchange="updatePRChart()">
-            {% for ex in exercise_list %}
-                <option value="{{ ex }}">{{ ex }}</option>
+<div class="container">
+    <form method="POST">
+        <label for="exercise_dropdown">Select Exercise for PR Tracking:</label>
+        <select name="exercise_dropdown" id="exercise_dropdown" onchange="this.form.submit()">
+            {% for ex in exercises %}
+                <option value="{{ ex }}" {% if ex == selected_exercise %}selected{% endif %}>{{ ex }}</option>
             {% endfor %}
         </select>
-        <div id="pr-chart-container">
-            <img id="pr-chart" src="{{ url_for('static', filename='pr_chart_default.png') }}" alt="PR Chart">
+    </form>
+
+    <div class="charts">
+        <div>
+            <h3>Workout Heatmap</h3>
+            <img src="/static/heatmap.png" alt="Workout Heatmap">
+        </div>
+        <div>
+            <h3>Training Volume Trend</h3>
+            <img src="/static/volume_trend.png" alt="Training Volume Trend">
+        </div>
+        <div>
+            <h3>Muscle Group Breakdown</h3>
+            <img src="/static/muscle_breakdown.png" alt="Muscle Group Breakdown">
+        </div>
+        <div>
+            <h3>PR Progression</h3>
+            <img src="/static/pr_chart.png" alt="PR Progression">
         </div>
     </div>
-
-    <!-- Weekly Volume -->
-    <div class="chart-container">
-        <h2>Weekly Training Volume</h2>
-        <img src="{{ url_for('static', filename='weekly_volume.png') }}" alt="Weekly Volume">
-    </div>
-
-    <!-- Workout Heatmap -->
-    <div class="chart-container">
-        <h2>Workout Frequency Heatmap</h2>
-        <img src="{{ url_for('static', filename='heatmap.png') }}" alt="Workout Heatmap">
-    </div>
-
-    <!-- Muscles Worked -->
-    <div class="chart-container">
-        <h2>Muscle Groups Worked</h2>
-        <img src="{{ url_for('static', filename='muscles_worked.png') }}" alt="Muscles Worked">
-    </div>
-</main>
+</div>
 
 <script>
-function toggleTheme() {
-    if (document.body.style.getPropertyValue('--bg-color') === '#121212') {
-        // Light mode
-        document.body.style.setProperty('--bg-color', '#f4f4f4');
-        document.body.style.setProperty('--text-color', '#222');
-        document.body.style.setProperty('--header-bg', '#333');
-        document.body.style.setProperty('--card-bg', 'white');
-    } else {
-        // Dark mode
-        document.body.style.setProperty('--bg-color', '#121212');
-        document.body.style.setProperty('--text-color', '#eee');
-        document.body.style.setProperty('--header-bg', '#1e1e1e');
-        document.body.style.setProperty('--card-bg', '#1e1e1e');
-    }
-}
-
-function updatePRChart() {
-    const exercise = document.getElementById("exercise-select").value;
-    fetch(`/pr_chart?exercise=${encodeURIComponent(exercise)}`)
-        .then(response => response.blob())
-        .then(blob => {
-            const imgUrl = URL.createObjectURL(blob);
-            document.getElementById("pr-chart").src = imgUrl;
-        });
+function toggleDarkMode() {
+    document.body.classList.toggle("dark-mode");
 }
 </script>
 
