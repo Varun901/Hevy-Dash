@@ -1,183 +1,109 @@
+import threading
+import time
+from flask import Flask, render_template
 import os
-import requests
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")  # For Render server compatibility
-import matplotlib.pyplot as plt
-from flask import Flask, render_template, request
+import requests
 from datetime import datetime
-import calendar
-from collections import defaultdict
+import matplotlib
+matplotlib.use('Agg')  # Use non-GUI backend for Render
+import matplotlib.pyplot as plt
 
 # Flask app
 app = Flask(__name__)
 
-# Hevy API settings
-HEVY_API_KEY = os.environ.get("HEVY_API_KEY")
-BASE_URL = "https://api.hevyapp.com/v1"
+# Environment variables (set in Render dashboard)
+HEVY_API_KEY = os.getenv("HEVY_API_KEY")
+AUTO_REFRESH_INTERVAL = 1800  # 30 min
 
-# ==============================
-# HELPER: Fetch workout history
-# ==============================
+# Cache for workouts
+cache_df = None
+
+# ---------------------------
+# Fetch data from Hevy API
+# ---------------------------
 def fetch_workouts():
     url = "https://api.hevyapp.com/v1/workouts?page=1&pageSize=10"
     headers = {
         "accept": "application/json",
-        "api-key": os.getenv("HEVY_API_KEY")
+        "api-key": HEVY_API_KEY
     }
     r = requests.get(url, headers=headers)
-    r.raise_for_status()
-    
-    json_data = r.json()
 
-    # FIX: Only return the "data" list, not the whole JSON dict
-    return json_data.get("data", [])
+    if r.status_code != 200:
+        print(f"[ERROR] API returned {r.status_code}: {r.text}")
+        return None
 
-# ==============================
-# HELPER: Process workout data
-# ==============================
-def process_workouts():
-    workouts = fetch_workouts()  # Now this is a list of workout dicts
+    data = r.json()
     rows = []
 
-    for w in workouts:
-        if not isinstance(w, dict):
-            continue
+    # Loop through workout items
+    for w in data.get("items", []):
+        try:
+            date = datetime.fromisoformat(w["start_time"].replace("Z", "+00:00")).date()
+        except Exception:
+            date = None
 
-        # Some entries might not have start_time
-        start_time = w.get("start_time")
-        if not start_time:
-            continue
-
-        date = datetime.fromisoformat(
-            start_time.replace("Z", "+00:00")
-        ).date()
-
-        rows.append({
-            "date": date,
-            "id": w.get("id"),
-            "exercises": w.get("exercises", [])
-        })
+        name = w.get("name", "Unknown")
+        volume = w.get("volume", 0)
+        rows.append({"date": date, "name": name, "volume": volume})
 
     df = pd.DataFrame(rows)
     return df
 
-# ==============================
-# CHART: Workout Heatmap
-# ==============================
-def create_heatmap(df):
-    if df.empty:
+# ---------------------------
+# Generate PNG charts
+# ---------------------------
+def generate_charts(df):
+    if df is None or df.empty:
         return
-    df_dates = df.groupby("date").size()
-    days = [d.timetuple().tm_yday for d in df_dates.index]
-    counts = df_dates.values
 
-    plt.figure(figsize=(12, 2))
-    plt.scatter(days, [1]*len(days), c=counts, cmap="Reds", s=100)
-    plt.yticks([])
-    plt.xticks(range(0, 366, 30), [calendar.month_abbr[m] for m in range(1, 13)])
-    plt.title("Workout Heatmap (Days Trained)", fontsize=14)
-    plt.colorbar(label="Workouts per day")
-    plt.savefig("static/heatmap.png", bbox_inches="tight")
-    plt.close()
+    # Sort by date
+    df = df.sort_values("date")
 
-# ==============================
-# CHART: Volume Trend
-# ==============================
-def create_volume_chart(df):
-    if df.empty:
-        return
-    df_vol = df.groupby("date")["volume"].sum().reset_index()
-
+    # Weekly volume trend
+    weekly = df.groupby("date")["volume"].sum()
     plt.figure(figsize=(8, 4))
-    plt.plot(df_vol["date"], df_vol["volume"], marker="o")
-    plt.title("Total Training Volume Over Time")
+    weekly.plot(kind="line", marker="o", title="Weekly Training Volume")
     plt.xlabel("Date")
-    plt.ylabel("Volume (kg)")
+    plt.ylabel("Volume")
     plt.grid(True)
-    plt.savefig("static/volume_trend.png", bbox_inches="tight")
+    plt.tight_layout()
+    plt.savefig("static/weekly_trend.png")
     plt.close()
 
-# ==============================
-# CHART: PR Graph
-# ==============================
-def create_pr_chart(df, exercise_name):
-    if df.empty:
-        return
-    ex_df = df[df["exercise"] == exercise_name]
-    if ex_df.empty:
-        return
-    ex_df["max_weight"] = ex_df.groupby("date")["weight"].transform("max")
-    pr_df = ex_df.groupby("date")["max_weight"].max().reset_index()
-
-    plt.figure(figsize=(8, 4))
-    plt.plot(pr_df["date"], pr_df["max_weight"], marker="o")
-    plt.title(f"PR Progression: {exercise_name}")
-    plt.xlabel("Date")
-    plt.ylabel("Max Weight (kg)")
-    plt.grid(True)
-    plt.savefig("static/pr_chart.png", bbox_inches="tight")
-    plt.close()
-
-# ==============================
-# CHART: Muscle Group Breakdown
-# ==============================
-def create_muscle_breakdown(df):
-    if df.empty:
-        return
-    # Placeholder grouping by keyword
-    muscle_map = defaultdict(float)
-    for _, row in df.iterrows():
-        ex = row["exercise"].lower()
-        vol = row["volume"]
-        if "bench" in ex or "press" in ex:
-            muscle_map["Chest/Shoulders"] += vol
-        elif "row" in ex or "pulldown" in ex or "pullup" in ex:
-            muscle_map["Back"] += vol
-        elif "curl" in ex:
-            muscle_map["Biceps"] += vol
-        elif "extension" in ex or "squat" in ex or "lunge" in ex:
-            muscle_map["Quads"] += vol
-        elif "rdl" in ex or "hip" in ex or "deadlift" in ex:
-            muscle_map["Glutes/Hamstrings"] += vol
-        elif "calf" in ex:
-            muscle_map["Calves"] += vol
+# ---------------------------
+# Auto refresh function
+# ---------------------------
+def auto_refresh_workouts():
+    global cache_df
+    while True:
+        print("[Auto-Refresh] Fetching latest workouts from Hevy API...")
+        df = fetch_workouts()
+        if df is not None and not df.empty:
+            cache_df = df
+            generate_charts(df)
+            print(f"[Auto-Refresh] Updated {len(df)} workouts at {datetime.now()}")
         else:
-            muscle_map["Other"] += vol
+            print("[Auto-Refresh] No data fetched.")
+        time.sleep(AUTO_REFRESH_INTERVAL)
 
-    labels = list(muscle_map.keys())
-    sizes = list(muscle_map.values())
-
-    plt.figure(figsize=(6, 6))
-    plt.pie(sizes, labels=labels, autopct="%1.1f%%")
-    plt.title("Training Volume by Muscle Group")
-    plt.savefig("static/muscle_breakdown.png", bbox_inches="tight")
-    plt.close()
-
-# ==============================
-# ROUTES
-# ==============================
-@app.route("/", methods=["GET", "POST"])
+# ---------------------------
+# Flask routes
+# ---------------------------
+@app.route("/")
 def dashboard():
-    df = process_workouts()
-    if not df.empty:
-        create_heatmap(df)
-        create_volume_chart(df)
-        create_muscle_breakdown(df)
+    global cache_df
+    if cache_df is None:
+        df = fetch_workouts()
+        if df is not None:
+            cache_df = df
+            generate_charts(df)
+    return render_template("dashboard.html")
 
-        selected_exercise = request.form.get("exercise_dropdown") or df["exercise"].iloc[0]
-        create_pr_chart(df, selected_exercise)
-
-        exercises = sorted(df["exercise"].unique())
-    else:
-        exercises = []
-        selected_exercise = None
-
-    return render_template(
-        "dashboard.html",
-        exercises=exercises,
-        selected_exercise=selected_exercise
-    )
-
+# ---------------------------
+# Main
+# ---------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)
+    threading.Thread(target=auto_refresh_workouts, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
