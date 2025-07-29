@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hevy Workout Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/dashboard.js" defer></script>
+</head>
+<body>
+    <h1>🏋️ Hevy Workout Dashboard</h1>
+
+    <section>
+        <h2>Workout Heatmap</h2>
+        <img src="/static/images/heatmap.png" alt="Heatmap">
+    </section>
+
+    <section>
+        <h2>Exercise Frequency</h2>
+        <img src="/static/images/exercise_distribution.png" alt="Exercise Distribution">
+    </section>
+
+    <section>
+        <h2>Weekly Volume Trend</h2>
+        <img src="/static/images/weekly_volume.png" alt="Weekly Volume">
+    </section>
+
+    <section>
+        <h2>PR Tracking</h2>
+        <select id="exerciseSelect"></select>
+        <canvas id="prChart" width="600" height="300"></canvas>
+    </section>
+</body>
+</html>
