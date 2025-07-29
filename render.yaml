@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hevy-dashboard
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python app.py"
+    envVars:
+      - key: HEVY_API_KEY
+        sync: false
