@@ -1,33 +1,117 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Hevy Workout Dashboard</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/static/js/dashboard.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: var(--bg-color, #f4f4f4);
+            color: var(--text-color, #222);
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background: var(--header-bg, #333);
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .toggle-container {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+        }
+        main {
+            padding: 20px;
+        }
+        .chart-container {
+            background: var(--card-bg, white);
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+        img {
+            max-width: 100%;
+        }
+        select {
+            padding: 6px;
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
-    <h1>🏋️ Hevy Workout Dashboard</h1>
 
-    <section>
-        <h2>Workout Heatmap</h2>
-        <img src="/static/images/heatmap.png" alt="Heatmap">
-    </section>
+<header>
+    <h1>Hevy Workout Dashboard</h1>
+    <div class="toggle-container">
+        <button onclick="toggleTheme()">Toggle Light/Dark</button>
+    </div>
+</header>
 
-    <section>
-        <h2>Exercise Frequency</h2>
-        <img src="/static/images/exercise_distribution.png" alt="Exercise Distribution">
-    </section>
+<main>
+    <!-- PR Tracking -->
+    <div class="chart-container">
+        <h2>Personal Record Tracking</h2>
+        <label for="exercise-select">Select Exercise:</label>
+        <select id="exercise-select" onchange="updatePRChart()">
+            {% for ex in exercise_list %}
+                <option value="{{ ex }}">{{ ex }}</option>
+            {% endfor %}
+        </select>
+        <div id="pr-chart-container">
+            <img id="pr-chart" src="{{ url_for('static', filename='pr_chart_default.png') }}" alt="PR Chart">
+        </div>
+    </div>
 
-    <section>
-        <h2>Weekly Volume Trend</h2>
-        <img src="/static/images/weekly_volume.png" alt="Weekly Volume">
-    </section>
+    <!-- Weekly Volume -->
+    <div class="chart-container">
+        <h2>Weekly Training Volume</h2>
+        <img src="{{ url_for('static', filename='weekly_volume.png') }}" alt="Weekly Volume">
+    </div>
 
-    <section>
-        <h2>PR Tracking</h2>
-        <select id="exerciseSelect"></select>
-        <canvas id="prChart" width="600" height="300"></canvas>
-    </section>
+    <!-- Workout Heatmap -->
+    <div class="chart-container">
+        <h2>Workout Frequency Heatmap</h2>
+        <img src="{{ url_for('static', filename='heatmap.png') }}" alt="Workout Heatmap">
+    </div>
+
+    <!-- Muscles Worked -->
+    <div class="chart-container">
+        <h2>Muscle Groups Worked</h2>
+        <img src="{{ url_for('static', filename='muscles_worked.png') }}" alt="Muscles Worked">
+    </div>
+</main>
+
+<script>
+function toggleTheme() {
+    if (document.body.style.getPropertyValue('--bg-color') === '#121212') {
+        // Light mode
+        document.body.style.setProperty('--bg-color', '#f4f4f4');
+        document.body.style.setProperty('--text-color', '#222');
+        document.body.style.setProperty('--header-bg', '#333');
+        document.body.style.setProperty('--card-bg', 'white');
+    } else {
+        // Dark mode
+        document.body.style.setProperty('--bg-color', '#121212');
+        document.body.style.setProperty('--text-color', '#eee');
+        document.body.style.setProperty('--header-bg', '#1e1e1e');
+        document.body.style.setProperty('--card-bg', '#1e1e1e');
+    }
+}
+
+function updatePRChart() {
+    const exercise = document.getElementById("exercise-select").value;
+    fetch(`/pr_chart?exercise=${encodeURIComponent(exercise)}`)
+        .then(response => response.blob())
+        .then(blob => {
+            const imgUrl = URL.createObjectURL(blob);
+            document.getElementById("pr-chart").src = imgUrl;
+        });
+}
+</script>
+
 </body>
 </html>
