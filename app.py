@@ -20,47 +20,44 @@ BASE_URL = "https://api.hevyapp.com/v1"
 # HELPER: Fetch workout history
 # ==============================
 def fetch_workouts():
-    workouts = []
-    page = 1
-    while True:
-        url = f"{BASE_URL}/workouts?page={page}&pageSize=10"
-        headers = {"accept": "application/json", "api-key": HEVY_API_KEY}
-        r = requests.get(url, headers=headers)
-        if r.status_code != 200:
-            print("API Error:", r.text)
-            break
-        data = r.json()
-        if not data:
-            break
-        workouts.extend(data)
-        page += 1
-    return workouts
+    url = "https://api.hevyapp.com/v1/workouts?page=1&pageSize=10"
+    headers = {
+        "accept": "application/json",
+        "api-key": os.getenv("HEVY_API_KEY")
+    }
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    
+    json_data = r.json()
+
+    # FIX: Only return the "data" list, not the whole JSON dict
+    return json_data.get("data", [])
 
 # ==============================
 # HELPER: Process workout data
 # ==============================
 def process_workouts():
-    workouts = fetch_workouts()
-    if not workouts:
-        return pd.DataFrame()
-
+    workouts = fetch_workouts()  # Now this is a list of workout dicts
     rows = []
+
     for w in workouts:
-        date = datetime.fromisoformat(w["start_time"].replace("Z", "+00:00")).date()
-        for ex in w.get("exercises", []):
-            name = ex["name"]
-            for set_data in ex.get("sets", []):
-                if set_data.get("weight_kg") is not None:
-                    weight = set_data.get("weight_kg", 0)
-                    reps = set_data.get("reps", 0)
-                    volume = weight * reps
-                    rows.append({
-                        "date": date,
-                        "exercise": name,
-                        "weight": weight,
-                        "reps": reps,
-                        "volume": volume
-                    })
+        if not isinstance(w, dict):
+            continue
+
+        # Some entries might not have start_time
+        start_time = w.get("start_time")
+        if not start_time:
+            continue
+
+        date = datetime.fromisoformat(
+            start_time.replace("Z", "+00:00")
+        ).date()
+
+        rows.append({
+            "date": date,
+            "id": w.get("id"),
+            "exercises": w.get("exercises", [])
+        })
 
     df = pd.DataFrame(rows)
     return df
