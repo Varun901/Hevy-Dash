@@ -1,0 +1,17 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: var(--bg);
+    color: var(--text);
+}
+h1, h2 {
+    text-align: center;
+}
+:root {
+    --bg: white;
+    --text: black;
+}
+[data-theme="dark"] {
+    --bg: #1e1e1e;
+    --text: #ffffff;
+}
