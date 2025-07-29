@@ -45,6 +45,11 @@ def process_data(workouts):
     volume_by_week = defaultdict(float)
     frequency = defaultdict(int)
     pr_data = defaultdict(list)
+    muscle_volume = defaultdict(float)
+
+    total_sets = 0
+    total_reps = 0
+    total_exercises = 0
 
     for w in workouts:
         date = datetime.strptime(w["start_time"], "%Y-%m-%dT%H:%M:%S.%fZ").date()
@@ -52,26 +57,45 @@ def process_data(workouts):
 
         for ex in w["exercises"]:
             ex_name = ex["name"]
+            muscle_group = ex.get("primary_muscle_group", "Other")
             frequency[ex_name] += 1
+            total_exercises += 1
 
-            # Calculate volume
             for set_ in ex.get("sets", []):
                 reps = set_.get("reps", 0)
                 weight = set_.get("weight", 0)
+                total_sets += 1
+                total_reps += reps
+
+                # Calculate volume
                 volume = reps * weight
                 volume_by_week[week] += volume
+                muscle_volume[muscle_group] += volume
 
-                # Track PR
+                # Track PRs
                 if weight > 0:
                     pr_data[ex_name].append({"date": date, "weight": weight})
 
             records.append({
                 "date": date,
                 "exercise": ex_name,
+                "muscle_group": muscle_group,
                 "sets": ex.get("sets", [])
             })
 
-    return pd.DataFrame(records), frequency, volume_by_week, pr_data
+    df = pd.DataFrame(records)
+
+    # Calculate summary metrics
+    avg_reps = total_reps / total_sets if total_sets else 0
+    avg_sets_per_ex = total_sets / total_exercises if total_exercises else 0
+
+    # Workouts per month
+    workouts_per_month = defaultdict(int)
+    for w in workouts:
+        month = datetime.strptime(w["start_time"], "%Y-%m-%dT%H:%M:%S.%fZ").strftime("%Y-%m")
+        workouts_per_month[month] += 1
+
+    return df, frequency, volume_by_week, pr_data, muscle_volume, avg_reps, avg_sets_per_ex, workouts_per_month
 
 # ---------------------------
 # Plots
@@ -100,24 +124,49 @@ def create_volume_trend(volume_by_week):
     plt.savefig("static/images/weekly_volume.png", bbox_inches="tight")
     plt.close()
 
+def create_muscle_group_chart(muscle_volume):
+    labels, values = zip(*muscle_volume.items()) if muscle_volume else ([], [])
+    plt.figure(figsize=(6, 6))
+    plt.pie(values, labels=labels, autopct="%1.0f%%")
+    plt.title("Volume by Muscle Group")
+    plt.savefig("static/images/muscle_volume.png", bbox_inches="tight")
+    plt.close()
+
+def create_monthly_workout_bar(workouts_per_month):
+    months, counts = zip(*sorted(workouts_per_month.items()))
+    plt.figure(figsize=(8, 4))
+    plt.bar(months, counts, color="orange")
+    plt.xticks(rotation=45)
+    plt.title("Workouts Per Month")
+    plt.savefig("static/images/workouts_per_month.png", bbox_inches="tight")
+    plt.close()
+
 # ---------------------------
 # Routes
 # ---------------------------
 @app.route("/")
 def dashboard():
     workouts = fetch_workouts()
-    df, frequency, volume_by_week, pr_data = process_data(workouts)
+    df, frequency, volume_by_week, pr_data, muscle_volume, avg_reps, avg_sets_per_ex, workouts_per_month = process_data(workouts)
 
     create_heatmap(df)
     create_exercise_distribution(frequency)
     create_volume_trend(volume_by_week)
+    create_muscle_group_chart(muscle_volume)
+    create_monthly_workout_bar(workouts_per_month)
 
-    return render_template("dashboard.html", pr_data=pr_data)
+    return render_template(
+        "dashboard.html",
+        pr_data=pr_data,
+        avg_reps=round(avg_reps, 1),
+        avg_sets=round(avg_sets_per_ex, 1),
+        total_workouts=len(workouts)
+    )
 
 @app.route("/pr_data")
 def get_pr_data():
     workouts = fetch_workouts()
-    _, _, _, pr_data = process_data(workouts)
+    _, _, _, pr_data, _, _, _, _ = process_data(workouts)
     return jsonify(pr_data)
 
 if __name__ == "__main__":
