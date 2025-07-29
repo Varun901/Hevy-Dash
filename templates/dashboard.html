@@ -1,130 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <title>Hevy Workout Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <!-- Refresh page every 5 minutes -->
+    <meta http-equiv="refresh" content="300">
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-            transition: background-color 0.4s, color 0.4s;
+            margin: 20px;
+            background-color: #f8f9fa;
+            color: #222;
         }
-
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #000000;
-        }
-
-        body.dark-mode {
-            --bg-color: #181818;
-            --text-color: #f5f5f5;
-        }
-
-        header {
-            padding: 1rem;
-            background: var(--text-color);
-            color: var(--bg-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
         h1 {
-            margin: 0;
+            color: #007BFF;
         }
-
-        .toggle-btn {
-            cursor: pointer;
-            background: none;
-            border: 1px solid var(--bg-color);
-            padding: 0.4rem 0.8rem;
-            color: var(--bg-color);
-            border-radius: 4px;
-        }
-
-        .container {
-            padding: 1rem;
-            max-width: 1200px;
-            margin: auto;
-        }
-
-        .charts {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-gap: 1.5rem;
-        }
-
         img {
-            width: 100%;
+            max-width: 100%;
+            border: 1px solid #ccc;
+            margin-top: 10px;
             border-radius: 6px;
-            background: var(--bg-color);
-            padding: 0.5rem;
-            box-shadow: 0px 0px 5px rgba(0,0,0,0.1);
         }
-
-        form {
-            margin-bottom: 1rem;
+        p {
+            font-size: 14px;
+            color: #555;
         }
-
-        select {
-            padding: 0.4rem;
-            font-size: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            .charts {
-                grid-template-columns: 1fr;
-            }
+        .chart-container {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
+    <h1>📊 Hevy Workout Dashboard</h1>
+    <p>This dashboard updates data from Hevy every 30 minutes and refreshes automatically every 5 minutes.</p>
 
-<header>
-    <h1>Hevy Workout Dashboard</h1>
-    <button class="toggle-btn" onclick="toggleDarkMode()">Toggle Dark Mode</button>
-</header>
-
-<div class="container">
-    <form method="POST">
-        <label for="exercise_dropdown">Select Exercise for PR Tracking:</label>
-        <select name="exercise_dropdown" id="exercise_dropdown" onchange="this.form.submit()">
-            {% for ex in exercises %}
-                <option value="{{ ex }}" {% if ex == selected_exercise %}selected{% endif %}>{{ ex }}</option>
-            {% endfor %}
-        </select>
-    </form>
-
-    <div class="charts">
-        <div>
-            <h3>Workout Heatmap</h3>
-            <img src="/static/heatmap.png" alt="Workout Heatmap">
-        </div>
-        <div>
-            <h3>Training Volume Trend</h3>
-            <img src="/static/volume_trend.png" alt="Training Volume Trend">
-        </div>
-        <div>
-            <h3>Muscle Group Breakdown</h3>
-            <img src="/static/muscle_breakdown.png" alt="Muscle Group Breakdown">
-        </div>
-        <div>
-            <h3>PR Progression</h3>
-            <img src="/static/pr_chart.png" alt="PR Progression">
-        </div>
+    <div class="chart-container">
+        <h2>Weekly Training Volume</h2>
+        <img src="/static/weekly_trend.png" alt="Weekly Training Volume Chart">
     </div>
-</div>
-
-<script>
-function toggleDarkMode() {
-    document.body.classList.toggle("dark-mode");
-}
-</script>
-
 </body>
 </html>
